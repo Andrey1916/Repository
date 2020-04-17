@@ -38,6 +38,9 @@ bld/
 #Intellij IDEA
 .idea/
 
+#Visual Studio Code
+.vscode/
+
 # Visual Studio 2017 auto generated files
 Generated\ Files/
 
