@@ -38,12 +38,13 @@ namespace TestProgram
                 typeof(BookAuthor),
                 typeof(LineItem),
                 typeof(Order),
-                typeof(Review)
+                typeof(Review),
+                typeof(Country)
             };
 
-            IRepository storage = new Repository.EF.Repository(connectionStringSQLite, types).UseMiddleware<TransactionalMiddleware>() ;
+            IRepository repository = new DbRepository(connectionStringSQLite, types);
 
-            var author1 = storage.AddOrUpdate(
+            var author1 = repository.AddOrUpdate(
                 new Author
                 {
                     Id = Guid.NewGuid(),
@@ -51,7 +52,7 @@ namespace TestProgram
                 }
                 );
 
-            var author2 = storage.Set<Author>().AddOrUpdate(
+            var author2 = repository.Set<Author>().AddOrUpdate(
                 new Author
                 {
                     Id = Guid.NewGuid(),
@@ -72,7 +73,7 @@ namespace TestProgram
 
                         for (int j = 0; j < 50; j++)
                         {
-                            storage.AddOrUpdate(new Book
+                            repository.AddOrUpdate(new Book
                             {
                                 Id          = Guid.NewGuid(),
                                 ActualPrice = 10M,
@@ -117,9 +118,9 @@ namespace TestProgram
 
                         for (int j = 0; j < 100; j++)
                         {
-                            var books = storage.Set<Book>().Skip(10).Take(30);
+                            var books = repository.Set<Book>().Skip(10).Take(30);
 
-                            storage.AddOrUpdate(new Book
+                            repository.AddOrUpdate(new Book
                             {
                                 Id          = Guid.NewGuid(),
                                 ActualPrice = 10M,
@@ -162,7 +163,7 @@ namespace TestProgram
 
                         for (int j = 0; j < 100; j++)
                         {
-                            var books = storage.Set<Book>().Skip(10).Take(40);
+                            var books = repository.Set<Book>().Skip(10).Take(40);
                         }
 
                         Console.WriteLine($"Thread number { Thread.CurrentThread.ManagedThreadId } (read) complite.");
@@ -199,10 +200,17 @@ namespace TestProgram
 
                         for (int j = 0; j < 100; j++)
                         {
-                            var bookId   = Guid.NewGuid();
-                            var authorId = Guid.NewGuid();
+                            var bookId    = Guid.NewGuid();
+                            var authorId  = Guid.NewGuid();
+                            var countryId = Guid.NewGuid();
 
-                            storage.AddOrUpdate(new Book
+                            repository.AddOrUpdate(new Country
+                            {
+                                Id   = countryId,
+                                Name = "GB"
+                            });
+
+                            repository.AddOrUpdate(new Book
                             {
                                 Id          = bookId,
                                 ActualPrice = 10M,
@@ -210,13 +218,14 @@ namespace TestProgram
                                 Title       = "Magic book " + j
                             });
 
-                            storage.AddOrUpdate(new Author
+                            repository.AddOrUpdate(new Author
                             {
-                                Id   = authorId,
-                                Name = "Говард Филлипс Лавкрафт"
+                                Id        = authorId,
+                                Name      = "Говард Филлипс Лавкрафт",
+                                CountryId = countryId
                             });
 
-                            storage.Set<BookAuthor>().AddOrUpdate(new BookAuthor
+                            repository.Set<BookAuthor>().AddOrUpdate(new BookAuthor
                             {
                                 Id       = Guid.NewGuid(),
                                 BookId   = bookId,
@@ -258,9 +267,9 @@ namespace TestProgram
 
                         for (int j = 0; j < 100; j++)
                         {
-                            var books = storage.Set<Book>().Skip(10).Take(40);
+                            var books = repository.Set<Book>().Skip(10).Take(40);
 
-                            var authors = storage.Set<Author>().Skip(10).Take(40);
+                            var authors = repository.Set<Author>().Skip(10).Take(40);
                         }
 
                         Console.WriteLine($"Thread number { Thread.CurrentThread.ManagedThreadId } (read) complite.");
@@ -299,9 +308,9 @@ namespace TestProgram
                             Console.WriteLine($"Thread number { Thread.CurrentThread.ManagedThreadId } (read) start.");
                             for (int j = 0; j < 100; j++)
                             {
-                                var books = storage.Set<Book>().Skip(10).Take(40);
+                                var books = repository.Set<Book>().Skip(10).Take(40);
 
-                                var authors = storage.Set<Author>().Skip(10).Take(40);
+                                var authors = repository.Set<Author>().Skip(10).Take(40);
                             }
 
                             Console.WriteLine($"Thread number { Thread.CurrentThread.ManagedThreadId } (read) complite.");
@@ -318,7 +327,7 @@ namespace TestProgram
 
                             for (int j = 0; j < 100; j++)
                             {
-                                storage.AddOrUpdate(new Book
+                                repository.AddOrUpdate(new Book
                                 {
                                     Id          = Guid.NewGuid(),
                                     ActualPrice = 10M,
@@ -353,34 +362,35 @@ namespace TestProgram
 
             dynamic[] results = new dynamic[9];
 
-            /* IEnumerable<User> */
-            results[0] = storage.Set<Book>();
-            /* IEnumerable<User> *//*
-            results[1] = storage.Set<BookAuthor>().Include(ba => ba.Author)
-                                                  .Where(ba => ba.Author.Name.StartsWith("Говард"));
-*/
-            /* User */
-            results[2] = storage.Set<Book>().FirstOrDefault();
-            /* IEnumerable<User> */
-            results[3] = storage.Set<Book>().Where(b => b.Title.StartsWith("Magic"));
-            /* IEnumerable<User> */
-            results[4] = storage.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
-                                            .Take(3);
+            /* IEnumerable<Book> */
+            results[0] = repository.Set<Book>();
+            /* IEnumerable<BookAuthor> */
+            results[1] = repository.Set<BookAuthor>().Include(ba => ba.Author)
+                                                     .ThenInclude(a => a.Country)
+                                                     .Where(ba => ba.Author.Country.Name.StartsWith("GB"))
+                                                     .ToList();
+            /* Book */
+            results[2] = repository.Set<Book>().FirstOrDefault();
+            /* IEnumerable<Book> */
+            results[3] = repository.Set<Book>().Where(b => b.Title.StartsWith("Magic"));
+            /* IEnumerable<Book> */
+            results[4] = repository.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
+                                               .Take(3);
             /* bool */
-            results[5] = storage.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
-                                            .Any();
+            results[5] = repository.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
+                                               .Any();
             /* int */
-            results[6] = storage.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
-                                            .Count();
-            /* IEnumerable<dynamic> */
-            results[7] = storage.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
-                                            .Take(5)
-                                            .Select(b => new { b.Id, b.Title});
+            results[6] = repository.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
+                                               .Count();
+            /* IEnumerable<anonimType> */
+            results[7] = repository.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
+                                               .Take(5)
+                                               .Select(b => new { b.Id, b.Title});
             /* string */
-            results[8] = storage.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
-                                            .Take(5)
-                                            .Select(b => new { b.Id, b.Title })
-                                            .ToSql();
+            results[8] = repository.Set<Book>().Where(b => b.Title.StartsWith("Magic"))
+                                               .Take(5)
+                                               .Select(b => new { b.Id, b.Title })
+                                               .ToSql();
 
             Console.WriteLine("Results: ");
             for (int i = 0; i < results.Length; i++)
@@ -397,7 +407,7 @@ namespace TestProgram
             Console.WriteLine("8) Transaction");
             Console.WriteLine();
 
-            using (var transaction = storage.BeginTransaction())
+            using (var transaction = repository.BeginTransaction())
             {
                 transaction.AddOrUpdate(new Book
                 {

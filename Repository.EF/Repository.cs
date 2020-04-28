@@ -7,15 +7,15 @@ using System.Text;
 
 namespace Repository.EF
 {
-    public class Repository : IRepository
+    public class DbRepository : IRepository
     {
         private readonly string connectionString;
         private readonly List<Type> types = new List<Type>();
         private static readonly object syncObj = new object();
 
-        public Repository(string connextionString, IEnumerable<Type> types)
+        public DbRepository(string connectionString, IEnumerable<Type> types)
         {
-            if ( string.IsNullOrEmpty(connextionString) )
+            if ( string.IsNullOrEmpty(connectionString) )
             {
                 throw new ArgumentException("Connection string is null or empty");
             }
@@ -25,6 +25,7 @@ namespace Repository.EF
                 throw new ArgumentException("List of types is null or empty");
             }
 
+            this.connectionString = connectionString;
 
             this.types.AddRange(types);
 

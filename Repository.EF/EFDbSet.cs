@@ -7,7 +7,7 @@ using System.Linq.Expressions;
 
 namespace Repository.EF
 {
-    class EFDbSet<T> : ISet<T>, IDisposable where T : class, IEntity
+    class EFDbSet<TEntity> : ISet<TEntity>, IDisposable where TEntity : class, IEntity
     {
         private bool disposed = false;
         private readonly DbContext context;
@@ -19,11 +19,11 @@ namespace Repository.EF
             this.syncObj = syncObj ?? throw new NullReferenceException(nameof(syncObj));
         }
 
-        public Type ElementType => ((IQueryable)context.Set<T>()).ElementType;
+        public Type ElementType => ((IQueryable)context.Set<TEntity>()).ElementType;
 
-        public Expression Expression => ((IQueryable)context.Set<T>()).Expression;
+        public Expression Expression => ((IQueryable)context.Set<TEntity>()).Expression;
 
-        public IQueryProvider Provider => ((IQueryable)context.Set<T>()).Provider;
+        public IQueryProvider Provider => ((IQueryable)context.Set<TEntity>()).Provider;
 
 
         public T GetById<T>(object id) where T : class
@@ -31,19 +31,19 @@ namespace Repository.EF
             return context.Find<T>(id);
         }
 
-        public T AddOrUpdate(T obj)
+        public TEntity AddOrUpdate(TEntity obj)
         {
             lock (syncObj)
             {
-                bool exist = context.Set<T>().Any(entity => entity.Id == obj.Id);
+                bool exist = context.Set<TEntity>().Any(entity => entity.Id == obj.Id);
 
                 if (!exist)
                 {
-                    context.Add<T>(obj);
+                    context.Add<TEntity>(obj);
                 }
                 else
                 {
-                    context.Update<T>(obj);
+                    context.Update<TEntity>(obj);
                 }
 
                 context.SaveChanges();
@@ -51,19 +51,19 @@ namespace Repository.EF
             return obj;
         }
 
-        public IEnumerator<T> GetEnumerator()
+        public IEnumerator<TEntity> GetEnumerator()
         {
-            return ((IEnumerable<T>)context.Set<T>()).GetEnumerator();
+            return ((IEnumerable<TEntity>)context.Set<TEntity>()).GetEnumerator();
         }
 
-        public void Remove(T obj)
+        public void Remove(TEntity obj)
         {
             context.Remove(obj);
         }
 
         public void Remove(object id)
         {
-            var entity = context.Set<T>().Find(id);
+            var entity = context.Set<TEntity>().Find(id);
 
             if (entity != null)
             {
@@ -73,9 +73,11 @@ namespace Repository.EF
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return ((IEnumerable)context.Set<T>()).GetEnumerator();
+            return ((IEnumerable)context.Set<TEntity>()).GetEnumerator();
         }
 
+        public Repository.Query.IIncludableQueryable<TEntity, TProperty> Include<TProperty>(Expression<Func<TEntity, TProperty>> navigationPropertyPath)
+            => new Query.IncludableQueryable<TEntity, TProperty>(context.Set<TEntity>().Include(navigationPropertyPath));
 
         #region Disposing
         public void Dispose()
