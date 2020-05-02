@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Repository.EF
 {
@@ -56,11 +57,11 @@ namespace Repository.EF
 
                     if (!exist)
                     {
-                        context.Add<T>(obj);
+                        context.Add(obj);
                     }
                     else
                     {
-                        context.Update<T>(obj);
+                        context.Update(obj);
                     }
 
                     context.SaveChanges();
@@ -74,6 +75,8 @@ namespace Repository.EF
             using (var context = new DataContext(connectionString, types))
             {
                 context.Remove(obj);
+
+                context.SaveChanges();
             }
         }
 
@@ -86,6 +89,8 @@ namespace Repository.EF
                 if (entity != null)
                 {
                     context.Remove(entity);
+
+                    context.SaveChanges();
                 }
             }
         }
@@ -102,6 +107,65 @@ namespace Repository.EF
             var context = new DataContext(connectionString, types);
 
             return new DbTransaction(context, syncObj);
+        }
+
+        public async Task<T> GetByIdAsync<T>(object id) where T : class
+        {
+            using (var context = new DataContext(connectionString, types))
+            {
+                return await context.FindAsync<T>(id);
+            }
+        }
+
+        public async Task<T> AddOrUpdateAsync<T>(T obj) where T : class, IEntity
+        {
+            return await Task.Run(() =>
+            {
+                using (var context = new DataContext(connectionString, types))
+                {
+                    lock (syncObj)
+                    {
+                        bool exist = context.Set<T>().Any(entity => entity.Id == obj.Id);
+
+                        if (!exist)
+                        {
+                            context.Add(obj);
+                        }
+                        else
+                        {
+                            context.Update(obj);
+                        }
+
+                        context.SaveChanges();
+                    }
+                    return obj;
+                }
+            });
+        }
+
+        public async Task RemoveAsync<T>(T obj) where T : class
+        {
+            using (var context = new DataContext(connectionString, types))
+            {
+                context.Remove(obj);
+
+                await context.SaveChangesAsync();
+            }
+        }
+
+        public async Task RemoveAsync<T>(object id) where T : class
+        {
+            using (var context = new DataContext(connectionString, types))
+            {
+                var entity = await context.Set<T>().FindAsync(id);
+
+                if (entity != null)
+                {
+                    context.Remove(entity);
+
+                    await context.SaveChangesAsync();
+                }
+            }
         }
     }
 }
